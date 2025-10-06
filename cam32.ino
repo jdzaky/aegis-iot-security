@@ -1,5 +1,4 @@
-// ESP32 Cam Motion Alert - Non-Blocking Architecture (MEMORY CORRUPTION FIXED + TELEGRAM STABLE)
-// DIPERBAIKI UNTUK MODEL 96x96
+// ESP32 Cam Motion Alert - Non-Blocking Architecture 
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiClient.h>
@@ -50,7 +49,7 @@ unsigned long lastDetectionTimestamp = 0; // millis() saat deteksi
 
 // Statistik klasifikasi
 uint32_t totalMotionCount = 0;
-uint32_t classificationCounts[EI_CLASSIFIER_LABEL_COUNT] = {0}; // diinisialisasi 0
+uint32_t classificationCounts[EI_CLASSIFIER_LABEL_COUNT] = {0}; 
 
 // Mode AI saat gerakan
 bool mlOnMotion = true; // default: aktif
@@ -154,7 +153,7 @@ bool checkWiFiConnection() {
     return true;
   }
 
-  if (xSemaphoreTake(xWiFiMutex, 5000 / portTICK_PERIOD_MS) != pdTRUE) { // <-- KURANGI timeout dari 10000 ke 5000
+  if (xSemaphoreTake(xWiFiMutex, 5000 / portTICK_PERIOD_MS) != pdTRUE) { 
     Serial.println("checkWiFiConnection: Gagal mengunci WiFi mutex (timeout).");
     return false;
   }
@@ -166,11 +165,11 @@ bool checkWiFiConnection() {
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
     int retries = 0;
-    while (WiFi.status() != WL_CONNECTED && retries < 10) { // <-- KURANGI dari 20 ke 10
+    while (WiFi.status() != WL_CONNECTED && retries < 10) {
       delay(500);
       Serial.print(".");
       retries++;
-      esp_task_wdt_reset(); // <-- TAMBAH INI
+      esp_task_wdt_reset(); 
     }
 
     if (WiFi.status() == WL_CONNECTED) {
@@ -263,7 +262,7 @@ void processingManagerTask(void *pvParameters) {
       esp_task_wdt_reset();
 
       // Gunakan retry mechanism
-      String result = executeTaskWithRetry(task_to_do, 2); // <-- UBAH INI
+      String result = executeTaskWithRetry(task_to_do, 2);
       String message;
 
       // Format message
@@ -386,11 +385,11 @@ void motionTask(void *pvParameters) {
   Serial.println("Motion Detection Task started.");
   
   // Konfigurasi deteksi
-  const int MOTION_THRESHOLD = 6;           // Jumlah bacaan HIGH berturut-turut
-  const unsigned long motionCooldown = 20000;  // Jeda antar alert (30 detik)
-  const unsigned long MIN_MOTION_DURATION = 2000; // Durasi minimum gerakan (2 detik)
-  const unsigned long POLLING_DELAY_HIGH = 250;   // Delay saat HIGH (ms)
-  const unsigned long POLLING_DELAY_LOW = 250;    // Delay saat LOW (ms)
+  const int MOTION_THRESHOLD = 6;           
+  const unsigned long motionCooldown = 20000; 
+  const unsigned long MIN_MOTION_DURATION = 2000; 
+  const unsigned long POLLING_DELAY_HIGH = 250;  
+  const unsigned long POLLING_DELAY_LOW = 250;    
   
   // State variables
   unsigned long lastMotionAlert = 0;
@@ -488,7 +487,7 @@ void connectWiFi() {
 }
 
 void healthMonitorTask(void *pvParameters) {
-  const unsigned long LOG_INTERVAL = 300000; // 5 menit
+  const unsigned long LOG_INTERVAL = 300000;
   unsigned long lastLog = 0;
   
   for (;;) {
@@ -573,7 +572,7 @@ void setupCamera() {
     s->set_vflip(s, 0);          // 0 = disable , 1 = enable
     s->set_dcw(s, 1);            // 0 = disable , 1 = enable
     s->set_colorbar(s, 0);       // 0 = disable , 1 = enable
-    s->set_framesize(s, FRAMESIZE_QQVGA); // lebih cepat & kecil
+    s->set_framesize(s, FRAMESIZE_QQVGA); 
   }
 
   Serial.println("Camera initialized successfully");
@@ -604,7 +603,7 @@ void setup() {
   xResponseQueue = xQueueCreate(5, sizeof(TelegramMessage));
   xWiFiMutex = xSemaphoreCreateMutex();
   xBufferMutex = xSemaphoreCreateMutex();
-  xTelegramMutex = xSemaphoreCreateMutex(); // <-- TAMBAHKAN INI
+  xTelegramMutex = xSemaphoreCreateMutex(); 
 
   if (!xProcessingQueue || !xResponseQueue || !xWiFiMutex || !xBufferMutex) {
     Serial.println("Failed to create resources!");
@@ -672,7 +671,6 @@ void handleNewMessages(int numNewMessages, UniversalTelegramBot& bot) {
       continue;
     }
 
-    // --- Semua command di bawah ini sudah dinormalisasi ---
     if (text == "/start") {
       String response = "🤖 AEGIS ESP32-CAM Motion AI\n"
                         "/photo - Ambil foto (tanpa klasifikasi)\n"
@@ -870,7 +868,7 @@ String classifyImage() {
     return "Gagal alokasi resized buffer";
   }
 
-  esp_task_wdt_reset(); // <-- TAMBAH INI sebelum resize
+  esp_task_wdt_reset(); 
   if (!resize_rgb888(rgb_full, in_w, in_h, rgb_resized, out_w, out_h)) {
     heap_caps_free(rgb_full);
     heap_caps_free(rgb_resized);
@@ -895,7 +893,7 @@ String classifyImage() {
                  (rgb_resized[idx + 1] * 0.587f) +
                  (rgb_resized[idx + 2] * 0.114f);
     inference_buffer[i] = gray;
-    if (i % 1000 == 0) esp_task_wdt_reset(); // <-- TAMBAH INI lebih sering (dari 2000 ke 1000)
+    if (i % 1000 == 0) esp_task_wdt_reset();
   }
 
   heap_caps_free(rgb_resized);
@@ -909,7 +907,7 @@ String classifyImage() {
   };
 
   ei_impulse_result_t result = { 0 };
-  esp_task_wdt_reset(); // <-- TAMBAH INI sebelum inference
+  esp_task_wdt_reset();
   EI_IMPULSE_ERROR res = run_classifier(&signal, &result, false);
 
   heap_caps_free(inference_buffer);
