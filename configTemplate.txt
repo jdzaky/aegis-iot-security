@@ -1,0 +1,32 @@
+#pragma once
+
+// This is an example configuration file.
+// 1. Copy this file to a new file named "config.h".
+// 2. Enter your credentials in "config.h".
+// 3. IMPORTANT: Make sure "config.h" is added to your .gitignore file
+//    so you DO NOT commit your secrets to a public repository.
+
+// --- WiFi Configuration ---
+#define WIFI_SSID "YOUR_WIFI_SSID"
+#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+
+// --- Telegram Bot Configuration ---
+// Get your Bot Token from BotFather
+#define BOT_TOKEN "YOUR_TELEGRAM_BOT_TOKEN"
+
+// The chat ID of the group where the bot will send alerts.
+// To get the group ID, add your bot to a group, send a message,
+// and then visit: https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates
+// The group chat ID will be a negative number.
+#define GROUP_CHAT_ID "YOUR_TELEGRAM_GROUP_ID"
+
+
+// --- Google Sheets Logger Configuration ---
+// 1. Create a Google Apps Script Web App using the provided `google-sheets-logger.js` file.
+// 2. Deploy the script as a Web App.
+// 3. Grant permissions to "Anyone" (for anonymous access).
+// 4. Paste the Web App URL here.
+#define GOOGLE_SHEETS_URL "YOUR_GOOGLE_SHEETS_WEB_APP_URL"
+
+// 5. Create a simple secret token to authenticate requests. This should match the token in your script.
+#define GOOGLE_SHEETS_TOKEN "YOUR_SECRET_TOKEN_HERE"

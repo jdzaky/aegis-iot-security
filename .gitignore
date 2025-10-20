@@ -1,0 +1,25 @@
+# Local configuration file with secrets
+config.h
+
+# Compiled output
+/build/
+*.o
+*.a
+*.elf
+*.bin
+*.hex
+
+# IDE-specific files
+.vscode/
+.pio/
+.idea/
+*.suo
+*.user
+*.userprefs
+
+# Arduino IDE temp files
+*.ino.cpp
+
+# OS-generated files
+.DS_Store
+Thumbs.db

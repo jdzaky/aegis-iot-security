@@ -1,0 +1,219 @@
+/**
+ * @file Google Apps Script for ESP32-CAM Data Logger (Advanced)
+ * @description This script logs data from an ESP32 to a Google Sheet. It features
+ * automatic header formatting, JSON responses, and helper functions for
+ * testing and creating a summary sheet.
+ *
+ * How to use:
+ * 1. Open a new Google Sheet.
+ * 2. Go to Extensions -> Apps Script.
+ * 3. Delete any existing code and paste this entire script.
+ * 4. IMPORTANT: Set your secret token in the `SECRET_TOKEN` variable below. This must match the
+ * `GOOGLE_SHEETS_TOKEN` in your ESP32's `config.h` file.
+ * 5. Click "Deploy" -> "New deployment".
+ * 6. For "Select type", choose "Web app".
+ * 7. In the dialog:
+ * - Description: "ESP32 CAM Data Logger"
+ * - Execute as: "Me"
+ * - Who has access: "Anyone" (This allows the ESP32 to send data without a login).
+ * 8. Click "Deploy" and authorize the script when prompted.
+ * 9. Copy the "Web app URL" and paste it into the `GOOGLE_SHEETS_URL` define in your
+ * ESP32's `config.h` file.
+ * 10. The sheet will be automatically formatted with headers on the first successful request.
+ */
+
+// !!! IMPORTANT !!!
+// SET YOUR SECRET TOKEN HERE. IT MUST MATCH THE ONE IN YOUR ESP32'S `config.h`.
+const SECRET_TOKEN = "YOUR_SECRET_TOKEN_HERE";
+const DATA_SHEET_NAME = "Data"; // You can change the name of the data sheet if you like
+
+/**
+ * @brief Handles GET requests from the ESP32.
+ * @param {Object} e The event parameter containing the request data.
+ * @returns {ContentService} A JSON response indicating success or failure.
+ */
+function doGet(e) {
+  try {
+    // 1. Validate the secret token
+    if (!e.parameter.token || e.parameter.token !== SECRET_TOKEN) {
+      return createJsonResponse({
+        status: "error",
+        message: "Invalid or missing token"
+      });
+    }
+
+    // 2. Get parameters from the ESP32 request
+    const temp = e.parameter.temp || "N/A";
+    const humidity = e.parameter.humidity || "N/A";
+    const detection = e.parameter.detection || "no_detection";
+    const motion = e.parameter.motion || "0";
+    const timestamp = new Date();
+
+    // 3. Open the spreadsheet and get the sheet
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = spreadsheet.getSheetByName(DATA_SHEET_NAME);
+    if (!sheet) {
+        sheet = spreadsheet.insertSheet(DATA_SHEET_NAME);
+    }
+
+    // 4. Check if headers exist and add them if they don't
+    if (sheet.getLastRow() === 0) {
+      const headers = ["Timestamp", "Temperature", "Humidity", "Detection", "MotionCount"];
+      sheet.appendRow(headers);
+
+      // Format the header row
+      const headerRange = sheet.getRange(1, 1, 1, headers.length);
+      headerRange.setFontWeight("bold")
+                 .setBackground("#4285f4")
+                 .setFontColor("#ffffff")
+                 .setHorizontalAlignment("center");
+      
+      // Set column widths for better readability
+      sheet.setColumnWidth(1, 180); // Timestamp
+      sheet.setColumnWidth(2, 120); // Temperature
+      sheet.setColumnWidth(3, 120); // Humidity
+      sheet.setColumnWidth(4, 150); // Detection
+      sheet.setColumnWidth(5, 120); // MotionCount
+      sheet.setFrozenRows(1);
+    }
+
+    // 5. Add the new data row
+    const newRow = [
+      timestamp,
+      parseFloat(temp),
+      parseFloat(humidity),
+      detection,
+      parseInt(motion)
+    ];
+    sheet.appendRow(newRow);
+
+    // 6. Format the newly added row
+    const lastRow = sheet.getLastRow();
+    const dataRange = sheet.getRange(lastRow, 1, 1, newRow.length);
+
+    // Format numbers and timestamp
+    sheet.getRange(lastRow, 1).setNumberFormat("yyyy-MM-dd HH:mm:ss");
+    sheet.getRange(lastRow, 2).setNumberFormat("0.00"); // Temperature
+    sheet.getRange(lastRow, 3).setNumberFormat("0.00"); // Humidity
+
+    // Apply alternating row colors (zebra striping) for readability
+    if (lastRow % 2 === 0) {
+      dataRange.setBackground("#f3f3f3");
+    }
+
+    // 7. Return a success response
+    return createJsonResponse({
+      status: "success",
+      message: "Data saved successfully",
+      timestamp: timestamp.toISOString(),
+      row: lastRow,
+      data: {
+        temperature: temp,
+        humidity: humidity,
+        detection: detection,
+        motionCount: motion
+      }
+    });
+
+  } catch (error) {
+    Logger.log("Error: " + error.toString());
+    return createJsonResponse({
+      status: "error",
+      message: error.toString()
+    });
+  }
+}
+
+/**
+ * @brief Helper function to create a JSON response.
+ * @param {Object} data The JavaScript object to stringify.
+ * @returns {ContentService} The ContentService object for the response.
+ */
+function createJsonResponse(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data, null, 2))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+
+// ========================================================
+//    UTILITY & TESTING FUNCTIONS (Run from Apps Script Editor)
+// ========================================================
+
+/**
+ * @brief Tests the doGet endpoint with mock data.
+ */
+function testEndpoint() {
+  const mockEvent = {
+    parameter: {
+      token: SECRET_TOKEN, // Use the real token for testing
+      temp: "28.60",
+      humidity: "59.50",
+      detection: "person",
+      motion: "5"
+    }
+  };
+  const result = doGet(mockEvent);
+  Logger.log(result.getContent());
+}
+
+/**
+ * @brief WARNING: This function will completely clear all data from the sheet.
+ */
+function resetSheet() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_SHEET_NAME);
+  if (sheet) {
+    sheet.clear();
+    Logger.log(`Sheet "${DATA_SHEET_NAME}" cleared successfully.`);
+  } else {
+    Logger.log(`Sheet "${DATA_SHEET_NAME}" not found.`);
+  }
+}
+
+/**
+ * @brief Creates or updates a "Summary" sheet with statistics from the data.
+ */
+function addSummarySheet() {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // Get or create the Summary sheet
+  let summarySheet = spreadsheet.getSheetByName("Summary");
+  if (!summarySheet) {
+    summarySheet = spreadsheet.insertSheet("Summary", 0); // Insert as the first sheet
+  }
+  summarySheet.clear();
+
+  const dataSheet = spreadsheet.getSheetByName(DATA_SHEET_NAME);
+  if (!dataSheet || dataSheet.getLastRow() <= 1) {
+    summarySheet.getRange("A1").setValue("No data available to summarize yet.");
+    return;
+  }
+
+  const lastRow = dataSheet.getLastRow();
+  const dataSheetName = `'${dataSheet.getName()}'`; // Get sheet name for formula references
+
+  // Headers
+  summarySheet.appendRow(["Metric", "Value"]);
+  summarySheet.getRange(1, 1, 1, 2).setFontWeight("bold").setBackground("#4285f4").setFontColor("#ffffff");
+
+  // Statistics using formulas that reference the data sheet
+  const stats = [
+    ["Total Records", lastRow - 1],
+    ["Avg Temperature", `=IFERROR(AVERAGE(${dataSheetName}!B2:B), "N/A")`],
+    ["Max Temperature", `=IFERROR(MAX(${dataSheetName}!B2:B), "N/A")`],
+    ["Min Temperature", `=IFERROR(MIN(${dataSheetName}!B2:B), "N/A")`],
+    ["Avg Humidity", `=IFERROR(AVERAGE(${dataSheetName}!C2:C), "N/A")`],
+    ["Total Motion Events", `=IFERROR(SUM(${dataSheetName}!E2:E), "N/A")`],
+    ["Last Update", `=INDIRECT("${dataSheetName}!A" & COUNTA(${dataSheetName}!A:A))`]
+  ];
+  summarySheet.getRange(2, 1, stats.length, 2).setValues(stats);
+  
+  // Formatting
+  summarySheet.setColumnWidth(1, 200);
+  summarySheet.setColumnWidth(2, 150);
+  summarySheet.getRange(3, 2, 4, 1).setNumberFormat("0.00"); // Temps & Humidity
+  summarySheet.getRange(8, 2).setNumberFormat("yyyy-MM-dd HH:mm:ss"); // Last Update
+
+  Logger.log("Summary sheet created/updated successfully.");
+}
+
